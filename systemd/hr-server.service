@@ -1,0 +1,15 @@
+[Unit]
+Description=HR Logger server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/code/hr-mon/server
+EnvironmentFile=/root/code/hr-mon/server/.env
+ExecStart=/root/code/hr-mon/server/.venv/bin/python run.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

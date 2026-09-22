@@ -6,27 +6,36 @@ copies, and serves the current bpm for OBS.
 
 ## Run
 
+Set up once:
+
 ```bash
+cp .env.example .env       # then put values in .env (gitignored)
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-Optionally install as a systemd service so it's always up:
+Start (reads the port from `.env` `HR_PORT`, default 8000):
 
+```bash
+.venv/bin/python run.py
 ```
-[Unit]
-Description=HR Logger server
-After=network.target
 
-[Service]
-WorkingDirectory=/home/makoto/code/HrStuff/server
-ExecStart=/home/makoto/code/HrStuff/server/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
-Restart=on-failure
-RestartSec=5
+`HR_PORT` is what you change if 8000 is taken (e.g. icecast). Auth: writes and
+`GET /readings` require header `X-Auth-Token` matching `.env` `HR_AUTH_TOKEN`;
+`/live`, `/bpm`, `/health` stay open.
 
-[Install]
-WantedBy=multi-user.target
+## Production (systemd)
+
+A ready-made unit is in `systemd/hr-server.service` (edit paths if your repo
+isn't at `/root/code/hr-mon`):
+
+```bash
+sudo cp systemd/hr-server.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hr-server
 ```
+
+Bind it in Cloudflare Tunnel to `http://localhost:8765` (or whatever
+`HR_PORT` is).
 
 ## Endpoints
 
