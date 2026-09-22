@@ -151,6 +151,14 @@ def get_stats(
     """Everything the dashboard needs for a range (optionally filtered to labeled sessions)."""
     _check_auth(x_auth_token)
 
+    # Resolve an effective window even when no dates were given, so the
+    # detected-activity-blocks list works on the "All" view too.
+    eff_start, eff_end = start, end
+    if not eff_start or not eff_end:
+        lo, hi = db.all_time_range()
+        eff_start = eff_start or lo
+        eff_end = eff_end or hi
+
     labeled = [l.strip() for l in (labels.split(",") if labels else []) if l.strip()]
     per_session = []
     intervals = []
@@ -170,12 +178,8 @@ def get_stats(
             )
             intervals.append((lo, hi))
     else:
-        if not start or not end:
-            lo, hi = db.all_time_range()
-            start = start or lo
-            end = end or hi
-        if start and end:
-            intervals.append((start, end))
+        if eff_start and eff_end:
+            intervals.append((eff_start, eff_end))
 
     parsed_all = []
     for lo, hi in intervals:
@@ -200,7 +204,7 @@ def get_stats(
         "hist_min": hist[0][0] if hist else None,
         "hist_max": hist[-1][1] if hist else None,
         "stretches": _stretches_minus_labeled(
-            db.detect_stretches(start, end, gap_s) if start and end else [],
+            db.detect_stretches(eff_start, eff_end, gap_s) if eff_start and eff_end else [],
             db.list_sessions(start=start, end=end),
         ),
         "sessions": db.list_sessions(start=start, end=end),
