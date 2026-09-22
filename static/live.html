@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HR</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+  #bpm {
+    font-family: "Arial Black", Arial, sans-serif;
+    font-size: clamp(80px, 20vh, 220px);
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 0 0 12px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.9);
+    background: transparent;
+    text-align: center;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #bpmlabel {
+    font-family: Arial, sans-serif;
+    font-size: clamp(18px, 4vh, 40px);
+    font-weight: bold;
+    color: #ff5555;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.85);
+    text-align: center;
+    background: transparent;
+    letter-spacing: 4px;
+    margin-top: 4px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+</style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;">
+  <div id="bpm">--</div>
+  <div id="bpmlabel">BPM</div>
+</div>
+<script>
+  async function refresh() {
+    try {
+      const resp = await fetch('/bpm', { cache: 'no-store' });
+      const text = (await resp.text()).trim();
+      const el = document.getElementById('bpm');
+      if (text !== '--') { el.textContent = text; }
+      else { el.textContent = '--'; }
+    } catch (e) {
+      document.getElementById('bpm').textContent = '--';
+    }
+  }
+  refresh();
+  setInterval(refresh, 500);
+</script>
+</body>
+</html>
