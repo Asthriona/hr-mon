@@ -19,9 +19,16 @@ Start (reads the port from `.env` `HR_PORT`, default 8000):
 .venv/bin/python run.py
 ```
 
-`HR_PORT` is what you change if 8000 is taken (e.g. icecast). Auth: writes and
-`GET /readings` require header `X-Auth-Token` matching `.env` `HR_AUTH_TOKEN`;
-`/live`, `/bpm`, `/health` stay open.
+`HR_PORT` is what you change if 8000 is taken (e.g. icecast). Auth: writes,
+`GET /readings`, `/stats` and `/sessions` require header `X-Auth-Token`
+matching `.env` `HR_AUTH_TOKEN`; `/live`, `/bpm`, `/health` stay open.
+
+The stats dashboard is a separate React app in `../web` — build it once so the
+API can serve it:
+
+```bash
+cd ../web && npm install && npm run build
+```
 
 ## Production (systemd)
 
@@ -35,19 +42,44 @@ sudo systemctl enable --now hr-server
 ```
 
 Bind it in Cloudflare Tunnel to `http://localhost:8765` (or whatever
-`HR_PORT` is).
+`HR_PORT` is). After a deploy, rebuild the frontend then restart:
+
+```bash
+cd web && npm ci && npm run build
+sudo systemctl restart hr-server
+```
 
 ## Endpoints
 
-| Method | Path        | Purpose                                                        |
-|--------|-------------|----------------------------------------------------------------|
-| POST   | `/readings` | Receive single or batch readings `{ts, bpm}`. Idempotent.      |
-| GET    | `/readings` | Query by `start`/`end` ISO range (used for verify-before-purge)|
-| GET    | `/bpm`      | Latest bpm as plain text (text-only OBS source).               |
-| GET    | `/live`     | Auto-refreshing HTML overlay (OBS browser source).             |
-| GET    | `/health`   | Health check + stored count.                                   |
+| Method   | Path            | Purpose                                                                  |
+|----------|-----------------|--------------------------------------------------------------------------|
+| POST     | `/readings`     | Receive single or batch readings `{ts, bpm}`. Idempotent.                |
+| GET      | `/readings`     | Query by `start`/`end` ISO range (verify-before-purge).                  |
+| GET      | `/stats`        | All dashboard numbers for a range (see below).                           |
+| GET      | `/sessions`     | List labeled sessions.                                                   |
+| POST     | `/sessions`     | Label a range: `{label: race\|practice\|work\|other, start_ts, end_ts}` |
+| DELETE   | `/sessions/{id}`| Remove a label.                                                          |
+| GET      | `/bpm`          | Latest bpm as plain text (text-only OBS source).                         |
+| GET      | `/live`         | Auto-refreshing HTML overlay (OBS browser source).                       |
+| GET      | `/dashboard`    | The stats web app (built SPA from `../web`).                             |
+| GET      | `/health`       | Health check + stored count.                                             |
 
 Interactive API docs: `http://host:8000/docs`.
+
+### `/stats`
+
+`GET /stats?start&end&labels&max_hr&bucket_s&gap_s`
+
+- `start`/`end` — UTC ISO bounds of the window (omit for all time).
+- `labels` — comma-separated; when set, stats cover only that union of labeled
+  sessions (e.g. all races). Per-session breakdown is included.
+- Without labels, `stretches` auto-detects continuous activity blocks
+  (gap > `gap_s`, default 150s) so you can label them from the UI.
+
+Returns `meta`, `current_bpm`, `overall` (avg/min/max/median/p10/p90/stdev,
+top-10% avg, peak-1min, resting estimate, time-in-zone by 5-zone model vs
+`max_hr`), `per_session`, `series` (bucketed), `histogram`, `stretches`,
+`sessions`.
 
 ## Durability
 
