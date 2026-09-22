@@ -21,15 +21,6 @@ from pydantic import BaseModel
 
 from db import Db, LABELS, compute_stats, series, histogram
 
-app = FastAPI(title="HR Logger Server", version="2.0")
-db = Db(os.environ.get("HR_DB", str(Path(__file__).parent / "hr-server.db")))
-
-STATIC_DIR = Path(__file__).parent / "static"          # live.html overlay
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
-WEB_DIST = WEB_DIR / "dist"
-WEB_STATIC = Path(__file__).resolve().parent.parent / "web" / "static"
-
-
 def _load_env(path: Path) -> None:
     """Load KEY=VALUE pairs from an (optional, gitignored) .env file."""
     if not path.exists():
@@ -43,9 +34,38 @@ def _load_env(path: Path) -> None:
             os.environ.setdefault(key.strip(), val.strip())
 
 
+# Env/.env is read first so HR_DB and HR_WEB below can come from server/.env.
+_load_env(Path(__file__).with_name(".env"))
+
+app = FastAPI(title="HR Logger Server", version="2.1")
+db = Db(os.environ.get("HR_DB", str(Path(__file__).parent / "hr-server.db")))
+
+STATIC_DIR = Path(__file__).parent / "static"          # live.html overlay
+
+
+def _web_root() -> Path:
+    """Where the dashboard build lives. Tries, in order:
+    - HR_WEB env override (a path to web/ or web/dist)
+    - git layout: <repo>/web   (server/ is a subfolder of the repo root)
+    - flat layout: <script dir>/web  (server files deployed loose, like on Fubuki)
+    """
+    override = os.environ.get("HR_WEB")
+    if override:
+        p = Path(override)
+        return p if p.name == "web" else p.parent
+    git = Path(__file__).resolve().parent.parent / "web"
+    if (git / "dist" / "index.html").exists():
+        return git
+    return Path(__file__).resolve().parent / "web"
+
+
+WEB_DIR = _web_root()
+WEB_DIST = WEB_DIR / "dist"
+WEB_STATIC = WEB_DIR / "static"
+
+
 # Secret required to write or query data. Comes from server/.env (gitignored)
 # or the HR_AUTH_TOKEN env var; if unset a random one is generated at startup.
-_load_env(Path(__file__).with_name(".env"))
 AUTH_TOKEN = os.environ.get("HR_AUTH_TOKEN")
 if not AUTH_TOKEN:
     AUTH_TOKEN = secrets.token_hex(32)
