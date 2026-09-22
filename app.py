@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from db import Db, LABELS, compute_stats, series, histogram
+from db import Db, LABELS, parse_ts, compute_stats, series, histogram
 
 def _load_env(path: Path) -> None:
     """Load KEY=VALUE pairs from an (optional, gitignored) .env file."""
@@ -37,7 +37,7 @@ def _load_env(path: Path) -> None:
 # Env/.env is read first so HR_DB and HR_WEB below can come from server/.env.
 _load_env(Path(__file__).with_name(".env"))
 
-app = FastAPI(title="HR Logger Server", version="2.1")
+app = FastAPI(title="HR Logger Server", version="2.2")
 db = Db(os.environ.get("HR_DB", str(Path(__file__).parent / "hr-server.db")))
 
 STATIC_DIR = Path(__file__).parent / "static"          # live.html overlay
@@ -199,9 +199,30 @@ def get_stats(
         "histogram": hist,
         "hist_min": hist[0][0] if hist else None,
         "hist_max": hist[-1][1] if hist else None,
-        "stretches": db.detect_stretches(start, end, gap_s) if start and end else [],
+        "stretches": _stretches_minus_labeled(
+            db.detect_stretches(start, end, gap_s) if start and end else [],
+            db.list_sessions(start=start, end=end),
+        ),
         "sessions": db.list_sessions(start=start, end=end),
     }
+
+
+def _stretches_minus_labeled(stretches: list, sessions: list) -> list:
+    """Drop already-labeled activity blocks so they leave the 'detected' list."""
+
+    def overlaps(a_s: str, a_e: str, b_s: str, b_e: str) -> bool:
+        try:
+            return parse_ts(a_s) < parse_ts(b_e) and parse_ts(a_e) > parse_ts(b_s)
+        except Exception:
+            return False
+
+    if not sessions:
+        return stretches
+    return [
+        st
+        for st in stretches
+        if not any(overlaps(st["start_ts"], st["end_ts"], s["start_ts"], s["end_ts"]) for s in sessions)
+    ]
 
 
 @app.get("/sessions")
