@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/code/hr-mon/server
-EnvironmentFile=/root/code/hr-mon/server/.env
-ExecStart=/root/code/hr-mon/server/.venv/bin/python run.py
+WorkingDirectory=/root/code/hr-mon/
+EnvironmentFile=/root/code/hr-mon/.env
+ExecStart=/root/code/hr-mon/.venv/bin/python run.py
 Restart=on-failure
 RestartSec=5
 
